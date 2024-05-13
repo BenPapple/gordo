@@ -1,30 +1,34 @@
-// Basic port scanner for TCP/IP open ports
+// Basic port scanner for TCP open ports
 package main
 
 import (
 	"flag"
 	"fmt"
 	"net"
+	"net/url"
 	"sort"
 	"sync"
+	"time"
 )
 
 var workers int
 var openports = []int{}
-var host string = "localhost"
+var host string = ""
+var isverbose bool
 
 // Flags
 var v = flag.Bool("v", false, "enable verbose output")
 var w = flag.Int("w", 10, "set worker count > 0")
-var t = flag.Bool("t", false, "set target IP/URL")
+var t = flag.String("t", "localhost", "set target IP/URL")
 
 // Program start
 func main() {
 	//work := make(chan int, workers)
 	var wg sync.WaitGroup
+	startTime := time.Now()
 
-	// Scanning system ports 0 to 1023
-	for i := 0; i < 1024; i++ {
+	// Scanning system ports 1 to 1023
+	for i := 8000; i < 8082; i++ {
 		wg.Add(1)
 		go scan(host, i, &wg)
 	}
@@ -33,6 +37,11 @@ func main() {
 	// Format output of program
 	sort.Ints(openports)
 	fmt.Println("Final list of open ports: ", openports)
+	stopTime := time.Now()
+	duration := stopTime.Sub(startTime)
+	if isverbose {
+		fmt.Println("Scan duration: ", duration)
+	}
 }
 
 // Port scan logic
@@ -51,23 +60,33 @@ func scan(host string, port int, wg *sync.WaitGroup) {
 func init() {
 	flag.Parse()
 	if *v {
+		isverbose = true
 		fmt.Println("Verbose mode active")
 	} else {
-		fmt.Println("Verbose mode not active")
+		isverbose = false
 	}
 
 	if *w > 0 {
 		workers = *w
-		fmt.Println("Worker Count: ", workers)
+
 	} else {
+		// Default on negative input
 		workers = 10
-		fmt.Println("Negative input, adjusted worker Count: ", workers)
 	}
 
-	if *t {
+	if isverbose {
+		fmt.Println("Worker Count: ", workers)
+	}
+
+	// Check for valid URI or IP in input
+	checkIP := net.ParseIP(*t)
+	_, err := url.ParseRequestURI(*t)
+	if err != nil && *t != "localhost" && checkIP == nil {
+		panic(err)
+	}
+
+	host = *t
+	if isverbose {
 		fmt.Println("Target chosen: ", host)
-	} else {
-		fmt.Println("Default target chosen: ", host)
 	}
-
 }
