@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -27,8 +28,15 @@ func main() {
 	var wg sync.WaitGroup
 	startTime := time.Now()
 
+	// Check for empty argument list
+	//fmt.Println("Args: ", os.Args)
+	if len(os.Args) <= 1 {
+		prheader()
+		os.Exit(0)
+	}
+
 	// Scanning system ports 1 to 1023
-	for i := 8000; i < 8082; i++ {
+	for i := 1; i < 1024; i++ {
 		wg.Add(1)
 		go scan(host, i, &wg)
 	}
@@ -89,4 +97,22 @@ func init() {
 	if isverbose {
 		fmt.Println("Target chosen: ", host)
 	}
+}
+
+// Print header when no arguments in CLI
+func prheader() {
+	var Reset = "\033[0m"
+	var White = "\033[97m"
+	fmt.Println("")
+	fmt.Println(White + ":'######:::'#######:'########:'########::'#######::::'######::'######::::'###:::'##::: ##'##::: ##'########'########::")
+	fmt.Println(" ##:::..:::##:::: ##:##:::: ##:##:::: ##:##:::: ##:::##:::..::##:::..::'##:. ##::####: ##:####: ##:##:::::::##:::: ##:")
+	fmt.Println(" ##::'####:##:::: ##:########::##:::: ##:##:::: ##::. ######::##::::::'##:::. ##:## ## ##:## ## ##:######:::########::")
+	fmt.Println(" ##::: ##::##:::: ##:##.. ##:::##:::: ##:##:::: ##:::..... ##:##:::::::#########:##. ####:##. ####:##...::::##.. ##:::")
+	fmt.Println(" ##::: ##::##:::: ##:##::. ##::##:::: ##:##:::: ##::'##::: ##:##::: ##:##.... ##:##:. ###:##:. ###:##:::::::##::. ##::")
+	fmt.Println(". ######::. #######::##:::. ##:########:. #######:::. ######:. ######::##:::: ##:##::. ##:##::. ##:########:##:::. ##:")
+	fmt.Println(":......::::.......::..:::::..:........:::.......:::::......:::......::..:::::..:..::::..:..::::..:........:..:::::..::" + Reset)
+	fmt.Println("")
+	fmt.Println("Use -h for help")
+	fmt.Println("Example use case: gordo -t 127.0.0.1")
+	fmt.Println("")
 }
