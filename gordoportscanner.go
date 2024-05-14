@@ -23,8 +23,6 @@ var host string = ""
 var isverbose bool
 var tokens chan struct{}
 
-//var tokens = make(chan struct{}, *w)
-
 // Program start
 func main() {
 	var wg sync.WaitGroup
@@ -37,18 +35,18 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Scanning system ports 1 to 1023
+	// Scanning system ports 1 to 1023 (max 65535)
 	for i := 1; i <= 65535; i++ {
 		wg.Add(1)
 		go scan(host, i, &wg)
 	}
 	wg.Wait()
 
-	// Format output of program
-	sort.Ints(openports)
-	fmt.Println("Final list of open ports: ", openports)
-	stopTime := time.Now()
+	// Format and output results
+	outtable()
 
+	// Manage duration of program
+	stopTime := time.Now()
 	if isverbose {
 		duration := stopTime.Sub(startTime)
 		fmt.Println("Scan duration: ", duration)
@@ -68,6 +66,27 @@ func scan(host string, port int, wg *sync.WaitGroup) {
 	conn.Close()
 	<-tokens
 	openports = append(openports, port)
+}
+
+// Print ordered results to terminal
+func outtable() {
+	sort.Ints(openports)
+	// Hashmap of common port names
+	porttype := make(map[int]string)
+	porttype[21] = "FTP"
+	porttype[22] = "SSH"
+	porttype[23] = "telnet"
+	porttype[42] = "nameserver"
+	porttype[80] = "HTTP"
+	porttype[443] = "HTTPS"
+	porttype[631] = "IPP"
+
+	// Output
+	for _, port := range openports {
+		ptype := porttype[port]
+		fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
+		fmt.Printf("%-5d %v\n", port, ptype)
+	}
 }
 
 // Set initial values from flags and other values
@@ -95,11 +114,12 @@ func init() {
 	// Check for valid URI or IP in input
 	checkIP := net.ParseIP(*t)
 	_, err := url.ParseRequestURI(*t)
+	// not URI & not localhost & not an IP
 	if err != nil && *t != "localhost" && checkIP == nil {
 		prheader()
 		fmt.Println("Error: No valid IP or URI given")
-		fmt.Println("Check IP: ", checkIP)
-		fmt.Println("Target candidate1: ", *t)
+		fmt.Println("Error: Check IP: ", checkIP)
+		fmt.Println("Error: Target candidate1: ", *t)
 		os.Exit(0)
 	}
 
