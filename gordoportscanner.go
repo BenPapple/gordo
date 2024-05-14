@@ -29,14 +29,15 @@ func main() {
 	tokens = make(chan struct{}, *w)
 	startTime := time.Now()
 
-	// Check for empty argument list
+	// Check for empty argument list and correct target input
 	if len(os.Args) <= 1 {
 		prheader()
 		os.Exit(0)
 	}
+	targetcheck()
 
 	// Scanning system ports 1 to 1023 (max 65535)
-	for i := 1; i <= 65535; i++ {
+	for i := 1; i <= 1023; i++ {
 		wg.Add(1)
 		go scan(host, i, &wg)
 	}
@@ -68,7 +69,7 @@ func scan(host string, port int, wg *sync.WaitGroup) {
 	openports = append(openports, port)
 }
 
-// Print ordered results to terminal
+// Print ordered results with added service type to terminal
 func outtable() {
 	sort.Ints(openports)
 
@@ -91,10 +92,30 @@ func outtable() {
 	porttype[3389] = "RDP"
 
 	// Output as table
+	fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
 	for _, port := range openports {
 		ptype := porttype[port]
-		fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
 		fmt.Printf("%-5d %v\n", port, ptype)
+	}
+}
+
+// Check if user input for target is valid IP or URI
+func targetcheck() {
+	// Check for valid URI or IP in input
+	checkIP := net.ParseIP(*t)
+	_, err := url.ParseRequestURI(*t)
+	// not URI & not localhost & not an IP
+	if err != nil && *t != "localhost" && checkIP == nil {
+		prheader()
+		fmt.Println("Error: No valid IP or URI given")
+		fmt.Println("Error: Check IP: ", checkIP)
+		fmt.Println("Error: Target candidate1: ", *t)
+		os.Exit(0)
+	}
+
+	host = *t
+	if isverbose {
+		fmt.Println("Scan target: ", host)
 	}
 }
 
@@ -118,23 +139,6 @@ func init() {
 
 	if isverbose {
 		fmt.Println("Worker Count: ", workers)
-	}
-
-	// Check for valid URI or IP in input
-	checkIP := net.ParseIP(*t)
-	_, err := url.ParseRequestURI(*t)
-	// not URI & not localhost & not an IP
-	if err != nil && *t != "localhost" && checkIP == nil {
-		prheader()
-		fmt.Println("Error: No valid IP or URI given")
-		fmt.Println("Error: Check IP: ", checkIP)
-		fmt.Println("Error: Target candidate1: ", *t)
-		os.Exit(0)
-	}
-
-	host = *t
-	if isverbose {
-		fmt.Println("Scan target chosen: ", host)
 	}
 }
 
