@@ -71,17 +71,26 @@ func scan(host string, port int, wg *sync.WaitGroup) {
 // Print ordered results to terminal
 func outtable() {
 	sort.Ints(openports)
+
 	// Hashmap of common port names
 	porttype := make(map[int]string)
 	porttype[21] = "FTP"
 	porttype[22] = "SSH"
 	porttype[23] = "telnet"
+	porttype[25] = "SMTP"
 	porttype[42] = "nameserver"
+	porttype[53] = "DNS"
 	porttype[80] = "HTTP"
+	porttype[137] = "NetBIOS"
+	porttype[138] = "NetBIOS"
+	porttype[139] = "NetBIOS"
 	porttype[443] = "HTTPS"
+	porttype[445] = "SMB"
 	porttype[631] = "IPP"
+	porttype[1433] = "MSSQL"
+	porttype[3389] = "RDP"
 
-	// Output
+	// Output as table
 	for _, port := range openports {
 		ptype := porttype[port]
 		fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
