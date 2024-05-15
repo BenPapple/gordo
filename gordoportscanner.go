@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,8 +37,17 @@ func main() {
 	}
 	targetcheck()
 
-	// Scanning system ports 1 to 1023 (max 65535)
-	for i := 1; i <= 1023; i++ {
+	if isverbose {
+		fmt.Println("Scan target: ", host)
+	}
+
+	// Scanning ports (system ports are 1 to 1023; max 65535
+	minport := 1
+	maxport := 65535
+	if isverbose {
+		fmt.Println("Scanning port", minport, "to port", maxport, ".")
+	}
+	for i := minport; i <= maxport; i++ {
 		wg.Add(1)
 		go scan(host, i, &wg)
 	}
@@ -50,6 +60,7 @@ func main() {
 	stopTime := time.Now()
 	if isverbose {
 		duration := stopTime.Sub(startTime)
+		fmt.Println("")
 		fmt.Println("Scan duration: ", duration)
 	}
 }
@@ -92,6 +103,9 @@ func outtable() {
 	porttype[3389] = "RDP"
 
 	// Output as table
+	if isverbose {
+		fmt.Println("")
+	}
 	fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
 	for _, port := range openports {
 		ptype := porttype[port]
@@ -101,22 +115,48 @@ func outtable() {
 
 // Check if user input for target is valid IP or URI
 func targetcheck() {
-	// Check for valid URI or IP in input
+
+	// Check for valid IP in input
 	checkIP := net.ParseIP(*t)
-	_, err := url.ParseRequestURI(*t)
-	// not URI & not localhost & not an IP
-	if err != nil && *t != "localhost" && checkIP == nil {
-		prheader()
-		fmt.Println("Error: No valid IP or URI given")
-		fmt.Println("Error: Check IP: ", checkIP)
-		fmt.Println("Error: Target candidate1: ", *t)
-		os.Exit(0)
+	if checkIP == nil {
+
+	} else {
+		host = *t
+		return
 	}
 
-	host = *t
-	if isverbose {
-		fmt.Println("Scan target: ", host)
+	// Check for valid URI in input
+	_, err := url.ParseRequestURI(*t)
+	if err != nil {
+
+	} else {
+		temphost := *t
+		host = strings.TrimPrefix(temphost, "http://")
+		return
 	}
+
+	// Check for if input is string localhost
+	if *t == "localhost" {
+		temphost := *t
+		host = strings.TrimPrefix(temphost, "http://")
+		return
+	}
+
+	// Add http prefix to check isURI again
+	temphost := fmt.Sprintf("%s%s", "http://", *t)
+	_, err2 := url.ParseRequestURI(temphost)
+	if err2 != nil {
+	} else {
+		host = strings.TrimPrefix(temphost, "http://")
+		return
+	}
+
+	// Exit program since no valid input
+	prheader()
+	fmt.Println("Error: No valid IP or URI given")
+	fmt.Println("Error on input target candidate: ", *t)
+	os.Exit(0)
+
 }
 
 // Set initial values from flags and other values
@@ -142,20 +182,23 @@ func init() {
 	}
 }
 
-// Print header when no arguments in CLI
+// Print header when no arguments in CLI or on error
 func prheader() {
 	var Reset = "\033[0m"
 	var White = "\033[97m"
+	fmt.Println("Gordo Port Scanner by BenPapple")
 	fmt.Println("")
-	fmt.Println(White + ":'######:::'#######:'########:'########::'#######::::'######::'######::::'###:::'##::: ##'##::: ##'########'########::")
-	fmt.Println(" ##:::..:::##:::: ##:##:::: ##:##:::: ##:##:::: ##:::##:::..::##:::..::'##:. ##::####: ##:####: ##:##:::::::##:::: ##:")
-	fmt.Println(" ##::'####:##:::: ##:########::##:::: ##:##:::: ##::. ######::##::::::'##:::. ##:## ## ##:## ## ##:######:::########::")
-	fmt.Println(" ##::: ##::##:::: ##:##.. ##:::##:::: ##:##:::: ##:::..... ##:##:::::::#########:##. ####:##. ####:##...::::##.. ##:::")
-	fmt.Println(" ##::: ##::##:::: ##:##::. ##::##:::: ##:##:::: ##::'##::: ##:##::: ##:##.... ##:##:. ###:##:. ###:##:::::::##::. ##::")
-	fmt.Println(". ######::. #######::##:::. ##:########:. #######:::. ######:. ######::##:::: ##:##::. ##:##::. ##:########:##:::. ##:")
-	fmt.Println(":......::::.......::..:::::..:........:::.......:::::......:::......::..:::::..:..::::..:..::::..:........:..:::::..::" + Reset)
+	// ANSI Shadow
+	fmt.Println(White + " ██████╗  ██████╗ ██████╗ ██████╗  ██████╗ ")
+	fmt.Println("██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗██╔═══██╗")
+	fmt.Println("██║  ███╗██║   ██║██████╔╝██║  ██║██║   ██║")
+	fmt.Println("██║   ██║██║   ██║██╔══██╗██║  ██║██║   ██║")
+	fmt.Println("╚██████╔╝╚██████╔╝██║  ██║██████╔╝╚██████╔╝")
+	fmt.Println(" ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝ " + Reset)
 	fmt.Println("")
 	fmt.Println("Use -h for help")
 	fmt.Println("Example use case: gordo -t 127.0.0.1")
+	fmt.Println("Example use case: gordo -t localhost")
+	fmt.Println("Example use case: gordo -t URL")
 	fmt.Println("")
 }
