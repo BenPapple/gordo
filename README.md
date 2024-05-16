@@ -14,5 +14,6 @@ Basic port scanner for TCP.
 
 
 # Use case
-./gordoportscanner.go -t 127.0.0.1
-./gordoportscanner.go -t URL
+go run gordoportscanner.go -t 127.0.0.1
+
+go run gordoportscanner.go -t URL
