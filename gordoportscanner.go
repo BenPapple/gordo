@@ -14,14 +14,16 @@ import (
 )
 
 // Flags
+var a = flag.Bool("a", false, "enable all ports scan")
+var t = flag.String("t", "localhost", "set target IP/URL")
 var v = flag.Bool("v", false, "enable verbose output")
 var w = flag.Int("w", 100, "set worker count > 0")
-var t = flag.String("t", "localhost", "set target IP/URL")
 
 var workers int
 var openports = []int{}
 var host string = ""
 var isverbose bool
+var isallports bool
 var tokens chan struct{}
 
 // Program start
@@ -41,9 +43,13 @@ func main() {
 		fmt.Println("Scan target: ", host)
 	}
 
-	// Scanning ports (system ports are 1 to 1023; max 65535
+	// Scanning ports (system ports are 1 to 1023; max 65535)
 	minport := 1
-	maxport := 65535
+	maxport := 1023
+	if isallports {
+		minport = 1
+		maxport = 65535
+	}
 	if isverbose {
 		fmt.Println("Scanning port", minport, "to port", maxport, ".")
 	}
@@ -167,6 +173,12 @@ func init() {
 		fmt.Println("Verbose mode active")
 	} else {
 		isverbose = false
+	}
+
+	if *a {
+		isallports = true
+	} else {
+		isallports = false
 	}
 
 	if *w > 0 {
