@@ -4,17 +4,23 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
 )
 
 // Flags
 var a = flag.Bool("a", false, "enable all ports scan")
+var syn = flag.String("syn", "", "use sudo and input network iface to enable scan against syn protections")
 var t = flag.String("t", "localhost", "set target IP/URL")
 var v = flag.Bool("v", false, "enable verbose output")
 var w = flag.Int("w", 100, "set worker count > 0")
@@ -22,9 +28,12 @@ var w = flag.Int("w", 100, "set worker count > 0")
 var workers int
 var openports = []int{}
 var host string = ""
+var targetIP string = ""
 var isverbose bool
 var isallports bool
+var issynscan bool
 var tokens chan struct{}
+var synmap = make(map[string]int)
 
 // Program start
 func main() {
@@ -43,6 +52,13 @@ func main() {
 		fmt.Println("Scan target: ", host)
 	}
 
+	// Sniff packets for extra header packets after handshake
+	if issynscan {
+		go sniff(*syn)
+		// Wait before tcp scanning starts
+		time.Sleep(1 * time.Second)
+	}
+
 	// Scanning ports (system ports are 1 to 1023; max 65535)
 	minport := 1
 	maxport := 1023
@@ -58,6 +74,11 @@ func main() {
 		go scan(host, i, &wg)
 	}
 	wg.Wait()
+
+	// Wait for packages some more
+	if issynscan {
+		time.Sleep(2 * time.Second)
+	}
 
 	// Format and output results
 	outtable()
@@ -86,6 +107,36 @@ func scan(host string, port int, wg *sync.WaitGroup) {
 	openports = append(openports, port)
 }
 
+// Sniff nr of packets for header packages after handshake to circumvent syn protections
+func sniff(iface string) {
+
+	// Filter for target host and non handshake passages
+	filter := fmt.Sprintf("%s%s%s", "ip src host ", targetIP, " and (tcp[13] == 0x11 or tcp[13] == 0x10 or tcp[13] == 0x18)")
+	handle, err := pcap.OpenLive(iface, int32(320), true, pcap.BlockForever)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	defer handle.Close()
+
+	if err := handle.SetBPFFilter(filter); err != nil {
+		log.Panicln(err)
+	}
+
+	// Find port of packet and add to results of syn scan
+	source := gopacket.NewPacketSource(handle, handle.LinkType())
+	for packet := range source.Packets() {
+		transportLayer := packet.TransportLayer()
+		if transportLayer == nil {
+			continue
+		}
+		// Result managing
+		srcPort := transportLayer.TransportFlow().Src().String()
+		synmap[srcPort] += 1
+	}
+
+}
+
 // Print ordered results with added service type to terminal
 func outtable() {
 	sort.Ints(openports)
@@ -108,7 +159,7 @@ func outtable() {
 	porttype[1433] = "MSSQL"
 	porttype[3389] = "RDP"
 
-	// Output as table
+	// Output as table standard
 	if isverbose {
 		fmt.Println("")
 	}
@@ -116,6 +167,20 @@ func outtable() {
 	for _, port := range openports {
 		ptype := porttype[port]
 		fmt.Printf("%-5d %v\n", port, ptype)
+	}
+
+	// Output as table syn
+	if issynscan {
+		fmt.Println("")
+		fmt.Println("SYNSCAN: ")
+		fmt.Printf("%-5v %-4v %v\n", "PORT", "SYN", "SERVICE")
+		for port, syn := range synmap {
+			if syn > 0 {
+				i, _ := strconv.Atoi(port)
+				ptype := porttype[i]
+				fmt.Printf("%-5s %-4d %s\n", port, syn, ptype)
+			}
+		}
 	}
 }
 
@@ -128,6 +193,7 @@ func targetcheck() {
 
 	} else {
 		host = *t
+		targetIP = *t
 		return
 	}
 
@@ -170,7 +236,7 @@ func init() {
 	flag.Parse()
 	if *v {
 		isverbose = true
-		fmt.Println("Verbose mode active")
+		fmt.Println("Gordo is in a talkative mood right now")
 	} else {
 		isverbose = false
 	}
@@ -179,6 +245,12 @@ func init() {
 		isallports = true
 	} else {
 		isallports = false
+	}
+
+	if *syn != "" {
+		issynscan = true
+	} else {
+		issynscan = false
 	}
 
 	if *w > 0 {
