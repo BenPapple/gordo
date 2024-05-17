@@ -50,6 +50,7 @@ func main() {
 
 	if isverbose {
 		fmt.Println("Scan target: ", host)
+		fmt.Println("Target IP:", targetIP)
 	}
 
 	// Sniff packets for extra header packets after handshake
@@ -77,7 +78,7 @@ func main() {
 
 	// Wait for packages some more
 	if issynscan {
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)
 	}
 
 	// Format and output results
@@ -189,9 +190,7 @@ func targetcheck() {
 
 	// Check for valid IP in input
 	checkIP := net.ParseIP(*t)
-	if checkIP == nil {
-
-	} else {
+	if checkIP != nil {
 		host = *t
 		targetIP = *t
 		return
@@ -199,11 +198,10 @@ func targetcheck() {
 
 	// Check for valid URI in input
 	_, err := url.ParseRequestURI(*t)
-	if err != nil {
-
-	} else {
+	if err == nil {
 		temphost := *t
 		host = strings.TrimPrefix(temphost, "http://")
+		targetIP = getIP()
 		return
 	}
 
@@ -211,15 +209,16 @@ func targetcheck() {
 	if *t == "localhost" {
 		temphost := *t
 		host = strings.TrimPrefix(temphost, "http://")
+		targetIP = getIP()
 		return
 	}
 
 	// Add http prefix to check isURI again
 	temphost := fmt.Sprintf("%s%s", "http://", *t)
 	_, err2 := url.ParseRequestURI(temphost)
-	if err2 != nil {
-	} else {
+	if err2 == nil {
 		host = strings.TrimPrefix(temphost, "http://")
+		targetIP = getIP()
 		return
 	}
 
@@ -228,6 +227,20 @@ func targetcheck() {
 	fmt.Println("Error: No valid IP or URI given")
 	fmt.Println("Error on input target candidate: ", *t)
 	os.Exit(0)
+
+}
+
+// Return IPv4 from URL
+func getIP() string {
+	ips, _ := net.LookupIP(host)
+	var tempIP string
+	for _, ip := range ips {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			tempIP = fmt.Sprintf("%v", ipv4)
+
+		}
+	}
+	return tempIP
 
 }
 
