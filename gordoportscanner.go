@@ -78,7 +78,7 @@ func main() {
 
 	// Wait for packages some more
 	if issynscan {
-		time.Sleep(3 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 	// Format and output results
@@ -175,11 +175,17 @@ func outtable() {
 		fmt.Println("")
 		fmt.Println("SYNSCAN: ")
 		fmt.Printf("%-5v %-4v %v\n", "PORT", "SYN", "SERVICE")
-		for port, syn := range synmap {
-			if syn > 0 {
-				i, _ := strconv.Atoi(port)
+		// Order map by string and print
+		keys := make([]string, 0)
+		for k := range synmap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if synmap[k] > 0 {
+				i, _ := strconv.Atoi(k)
 				ptype := porttype[i]
-				fmt.Printf("%-5s %-4d %s\n", port, syn, ptype)
+				fmt.Printf("%-5s %-4d %s\n", k, synmap[k], ptype)
 			}
 		}
 	}
