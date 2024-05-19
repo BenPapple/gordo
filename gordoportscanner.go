@@ -26,27 +26,26 @@ var v = flag.Bool("v", false, "enable verbose output")
 var w = flag.Int("w", 100, "set worker count > 0")
 
 var workers int
-var openPorts = []int{}
-var host string = ""
-var targetIP string = ""
 var isVerbose bool
 var isAllPorts bool
 var isSynScan bool
-var tokens chan struct{}
-var synResults = make(map[string]int)
 
 // Program start
 func main() {
 	var wg sync.WaitGroup
-	tokens = make(chan struct{}, *w)
+	var openPorts = []int{}
+	var synResults = map[string]int{}
+	var host string = ""
+	var targetIP string = ""
+	tokens := make(chan struct{}, *w)
 	startTime := time.Now()
 
-	// Check for empty argument list and correct target input
+	// Check for empty argument list and validate target input
 	if len(os.Args) <= 1 {
 		prheader()
 		os.Exit(0)
 	}
-	targetcheck()
+	targetcheck(&host, &targetIP)
 
 	if isVerbose {
 		fmt.Println("Scan target: ", host)
@@ -55,7 +54,7 @@ func main() {
 
 	// Sniff packets for extra header packets after handshake
 	if isSynScan {
-		go sniff(*syn)
+		go sniff(*syn, synResults, &targetIP)
 		// Wait before tcp scanning starts
 		time.Sleep(1 * time.Second)
 	}
@@ -72,17 +71,17 @@ func main() {
 	}
 	for i := minPort; i <= maxPort; i++ {
 		wg.Add(1)
-		go scan(host, i, &wg)
+		go scan(host, i, &wg, &tokens, &openPorts)
 	}
 	wg.Wait()
 
-	// Wait for packages some more
+	// Wait for packets some more
 	if isSynScan {
 		time.Sleep(2 * time.Second)
 	}
 
 	// Format and output results
-	outtable()
+	outtable(openPorts, isVerbose, isSynScan, synResults)
 
 	// Manage duration of program
 	stopTime := time.Now()
@@ -94,25 +93,25 @@ func main() {
 }
 
 // Port scan logic
-func scan(host string, port int, wg *sync.WaitGroup) {
+func scan(host string, port int, wg *sync.WaitGroup, tokens *chan struct{}, openPorts *[]int) {
 	defer wg.Done()
-	tokens <- struct{}{}
+	*tokens <- struct{}{}
 	target := fmt.Sprintf("%s:%d", host, port)
 	conn, err := net.Dial("tcp", target)
 	if err != nil {
-		<-tokens
+		<-*tokens
 		return
 	}
 	conn.Close()
-	<-tokens
-	openPorts = append(openPorts, port)
+	<-*tokens
+	*openPorts = append(*openPorts, port)
 }
 
-// Sniff nr of packets for header packages after handshake to circumvent syn protections
-func sniff(iface string) {
+// Sniff nr of packets for header packets after handshake to circumvent syn protections
+func sniff(iface string, synResults map[string]int, targetIP *string) {
 
 	// Filter for target host and non handshake passages
-	filter := fmt.Sprintf("%s%s%s", "ip src host ", targetIP, " and (tcp[13] == 0x11 or tcp[13] == 0x10 or tcp[13] == 0x18)")
+	filter := fmt.Sprintf("%s%s%s", "ip src host ", *targetIP, " and (tcp[13] == 0x11 or tcp[13] == 0x10 or tcp[13] == 0x18)")
 	handle, err := pcap.OpenLive(iface, int32(320), true, pcap.BlockForever)
 	if err != nil {
 		log.Panicln(err)
@@ -139,7 +138,7 @@ func sniff(iface string) {
 }
 
 // Print ordered results with added service type to terminal
-func outtable() {
+func outtable(openPorts []int, isVerbose bool, isSynScan bool, synResults map[string]int) {
 	sort.Ints(openPorts)
 
 	// Hashmap of common port names
@@ -192,13 +191,13 @@ func outtable() {
 }
 
 // Check if user input for target is valid IP or URI
-func targetcheck() {
+func targetcheck(host *string, targetIP *string) {
 
 	// Check for valid IP in input
 	checkIP := net.ParseIP(*t)
 	if checkIP != nil {
-		host = *t
-		targetIP = *t
+		*host = *t
+		*targetIP = *t
 		return
 	}
 
@@ -206,16 +205,16 @@ func targetcheck() {
 	_, err := url.ParseRequestURI(*t)
 	if err == nil {
 		tempHost := *t
-		host = strings.TrimPrefix(tempHost, "http://")
-		targetIP = getIP()
+		*host = strings.TrimPrefix(tempHost, "http://")
+		*targetIP = getIP(*host)
 		return
 	}
 
 	// Check for if input is string localhost
 	if *t == "localhost" {
 		tempHost := *t
-		host = strings.TrimPrefix(tempHost, "http://")
-		targetIP = getIP()
+		*host = strings.TrimPrefix(tempHost, "http://")
+		*targetIP = getIP(*host)
 		return
 	}
 
@@ -223,8 +222,8 @@ func targetcheck() {
 	tempHost := fmt.Sprintf("%s%s", "http://", *t)
 	_, err2 := url.ParseRequestURI(tempHost)
 	if err2 == nil {
-		host = strings.TrimPrefix(tempHost, "http://")
-		targetIP = getIP()
+		*host = strings.TrimPrefix(tempHost, "http://")
+		*targetIP = getIP(*host)
 		return
 	}
 
@@ -237,7 +236,7 @@ func targetcheck() {
 }
 
 // Return IPv4 from URL
-func getIP() string {
+func getIP(host string) string {
 	ips, _ := net.LookupIP(host)
 	var tempIP string
 	for _, ip := range ips {
