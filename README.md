@@ -6,6 +6,8 @@ Basic port scanner for TCP.
 
 -h help
 
+-s "use sudo and input network iface to enable scan against syn protections"
+
 -t "set target IP/URL"
 
 -v "enable verbose output"
