@@ -33,8 +33,7 @@ var isSynScan bool
 // Program start
 func main() {
 	var wg sync.WaitGroup
-	var openPorts = []int{}
-	var synResults = map[string]int{}
+	var openPorts = map[string]int{}
 	var host string = ""
 	var targetIP string = ""
 	tokens := make(chan struct{}, *w)
@@ -54,7 +53,7 @@ func main() {
 
 	// Sniff packets for extra header packets after handshake
 	if isSynScan {
-		go sniff(*syn, synResults, &targetIP)
+		go sniff(*syn, openPorts, &targetIP)
 		// Wait before tcp scanning starts
 		time.Sleep(1 * time.Second)
 	}
@@ -71,7 +70,7 @@ func main() {
 	}
 	for i := minPort; i <= maxPort; i++ {
 		wg.Add(1)
-		go scan(host, i, &wg, &tokens, &openPorts)
+		go scan(host, i, &wg, &tokens, openPorts)
 	}
 	wg.Wait()
 
@@ -81,7 +80,7 @@ func main() {
 	}
 
 	// Format and output results
-	outTable(openPorts, isVerbose, isSynScan, synResults)
+	outTable(isVerbose, isSynScan, openPorts)
 
 	// Manage duration of program
 	stopTime := time.Now()
@@ -93,7 +92,7 @@ func main() {
 }
 
 // Port scan logic
-func scan(host string, port int, wg *sync.WaitGroup, tokens *chan struct{}, openPorts *[]int) {
+func scan(host string, port int, wg *sync.WaitGroup, tokens *chan struct{}, openPorts map[string]int) {
 	defer wg.Done()
 	*tokens <- struct{}{}
 	target := fmt.Sprintf("%s:%d", host, port)
@@ -104,11 +103,12 @@ func scan(host string, port int, wg *sync.WaitGroup, tokens *chan struct{}, open
 	}
 	conn.Close()
 	<-*tokens
-	*openPorts = append(*openPorts, port)
+	portString := fmt.Sprintf("%d", port)
+	openPorts[portString] += 0
 }
 
 // Sniff nr of packets for header packets after handshake to circumvent syn protections
-func sniff(iface string, synResults map[string]int, targetIP *string) {
+func sniff(iface string, openPorts map[string]int, targetIP *string) {
 
 	// Filter for target host and non handshake passages
 	filter := fmt.Sprintf("%s%s%s", "ip src host ", *targetIP, " and (tcp[13] == 0x11 or tcp[13] == 0x10 or tcp[13] == 0x18)")
@@ -132,14 +132,13 @@ func sniff(iface string, synResults map[string]int, targetIP *string) {
 		}
 		// Result managing
 		srcPort := transportLayer.TransportFlow().Src().String()
-		synResults[srcPort] += 1
+		openPorts[srcPort] += 1
 	}
 
 }
 
 // Print ordered results with added service type to terminal
-func outTable(openPorts []int, isVerbose bool, isSynScan bool, synResults map[string]int) {
-	sort.Ints(openPorts)
+func outTable(isVerbose bool, isSynScan bool, openPorts map[string]int) {
 
 	// Hashmap of common port names
 	portType := make(map[int]string)
@@ -177,28 +176,36 @@ func outTable(openPorts []int, isVerbose bool, isSynScan bool, synResults map[st
 	if isVerbose {
 		fmt.Println("")
 	}
-	fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
-	for _, port := range openPorts {
-		pType := portType[port]
-		fmt.Printf("%-5d %v\n", port, pType)
-	}
 
 	// Output as table syn
 	if isSynScan {
-		fmt.Println("")
-		fmt.Println("SYNSCAN: ")
 		fmt.Printf("%-5v %-4v %v\n", "PORT", "SYN", "SERVICE")
 		// Order map by string and print
 		keys := make([]string, 0)
-		for k := range synResults {
+		for k := range openPorts {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			if synResults[k] > 0 {
+			if openPorts[k] > 0 {
 				i, _ := strconv.Atoi(k)
 				pType := portType[i]
-				fmt.Printf("%-5s %-4d %s\n", k, synResults[k], pType)
+				fmt.Printf("%-5s %-4d %s\n", k, openPorts[k], pType)
+			}
+		}
+	} else {
+		fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
+		// Order map by string and print
+		keys := make([]string, 0)
+		for k := range openPorts {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if openPorts[k] >= 0 {
+				i, _ := strconv.Atoi(k)
+				pType := portType[i]
+				fmt.Printf("%-5s %s\n", k, pType)
 			}
 		}
 	}
