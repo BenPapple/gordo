@@ -26,14 +26,14 @@ var v = flag.Bool("v", false, "enable verbose output")
 var w = flag.Int("w", 100, "set worker count > 0")
 
 var workers int
-var openports = []int{}
+var openPorts = []int{}
 var host string = ""
 var targetIP string = ""
-var isverbose bool
-var isallports bool
-var issynscan bool
+var isVerbose bool
+var isAllPorts bool
+var isSynScan bool
 var tokens chan struct{}
-var synmap = make(map[string]int)
+var synResults = make(map[string]int)
 
 // Program start
 func main() {
@@ -48,36 +48,36 @@ func main() {
 	}
 	targetcheck()
 
-	if isverbose {
+	if isVerbose {
 		fmt.Println("Scan target: ", host)
 		fmt.Println("Target IP:", targetIP)
 	}
 
 	// Sniff packets for extra header packets after handshake
-	if issynscan {
+	if isSynScan {
 		go sniff(*syn)
 		// Wait before tcp scanning starts
 		time.Sleep(1 * time.Second)
 	}
 
 	// Scanning ports (system ports are 1 to 1023; max 65535)
-	minport := 1
-	maxport := 1023
-	if isallports {
-		minport = 1
-		maxport = 65535
+	minPort := 1
+	maxPort := 1023
+	if isAllPorts {
+		minPort = 1
+		maxPort = 65535
 	}
-	if isverbose {
-		fmt.Println("Scanning port", minport, "to port", maxport, ".")
+	if isVerbose {
+		fmt.Println("Scanning port", minPort, "to port", maxPort, ".")
 	}
-	for i := minport; i <= maxport; i++ {
+	for i := minPort; i <= maxPort; i++ {
 		wg.Add(1)
 		go scan(host, i, &wg)
 	}
 	wg.Wait()
 
 	// Wait for packages some more
-	if issynscan {
+	if isSynScan {
 		time.Sleep(2 * time.Second)
 	}
 
@@ -86,7 +86,7 @@ func main() {
 
 	// Manage duration of program
 	stopTime := time.Now()
-	if isverbose {
+	if isVerbose {
 		duration := stopTime.Sub(startTime)
 		fmt.Println("")
 		fmt.Println("Scan duration: ", duration)
@@ -105,7 +105,7 @@ func scan(host string, port int, wg *sync.WaitGroup) {
 	}
 	conn.Close()
 	<-tokens
-	openports = append(openports, port)
+	openPorts = append(openPorts, port)
 }
 
 // Sniff nr of packets for header packages after handshake to circumvent syn protections
@@ -133,59 +133,59 @@ func sniff(iface string) {
 		}
 		// Result managing
 		srcPort := transportLayer.TransportFlow().Src().String()
-		synmap[srcPort] += 1
+		synResults[srcPort] += 1
 	}
 
 }
 
 // Print ordered results with added service type to terminal
 func outtable() {
-	sort.Ints(openports)
+	sort.Ints(openPorts)
 
 	// Hashmap of common port names
-	porttype := make(map[int]string)
-	porttype[21] = "FTP"
-	porttype[22] = "SSH"
-	porttype[23] = "telnet"
-	porttype[25] = "SMTP"
-	porttype[42] = "nameserver"
-	porttype[53] = "DNS"
-	porttype[80] = "HTTP"
-	porttype[137] = "NetBIOS"
-	porttype[138] = "NetBIOS"
-	porttype[139] = "NetBIOS"
-	porttype[443] = "HTTPS"
-	porttype[445] = "SMB"
-	porttype[631] = "IPP"
-	porttype[1433] = "MSSQL"
-	porttype[3389] = "RDP"
+	portType := make(map[int]string)
+	portType[21] = "FTP"
+	portType[22] = "SSH"
+	portType[23] = "telnet"
+	portType[25] = "SMTP"
+	portType[42] = "nameserver"
+	portType[53] = "DNS"
+	portType[80] = "HTTP"
+	portType[137] = "NetBIOS"
+	portType[138] = "NetBIOS"
+	portType[139] = "NetBIOS"
+	portType[443] = "HTTPS"
+	portType[445] = "SMB"
+	portType[631] = "IPP"
+	portType[1433] = "MSSQL"
+	portType[3389] = "RDP"
 
 	// Output as table standard
-	if isverbose {
+	if isVerbose {
 		fmt.Println("")
 	}
 	fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
-	for _, port := range openports {
-		ptype := porttype[port]
-		fmt.Printf("%-5d %v\n", port, ptype)
+	for _, port := range openPorts {
+		pType := portType[port]
+		fmt.Printf("%-5d %v\n", port, pType)
 	}
 
 	// Output as table syn
-	if issynscan {
+	if isSynScan {
 		fmt.Println("")
 		fmt.Println("SYNSCAN: ")
 		fmt.Printf("%-5v %-4v %v\n", "PORT", "SYN", "SERVICE")
 		// Order map by string and print
 		keys := make([]string, 0)
-		for k := range synmap {
+		for k := range synResults {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			if synmap[k] > 0 {
+			if synResults[k] > 0 {
 				i, _ := strconv.Atoi(k)
-				ptype := porttype[i]
-				fmt.Printf("%-5s %-4d %s\n", k, synmap[k], ptype)
+				pType := portType[i]
+				fmt.Printf("%-5s %-4d %s\n", k, synResults[k], pType)
 			}
 		}
 	}
@@ -205,25 +205,25 @@ func targetcheck() {
 	// Check for valid URI in input
 	_, err := url.ParseRequestURI(*t)
 	if err == nil {
-		temphost := *t
-		host = strings.TrimPrefix(temphost, "http://")
+		tempHost := *t
+		host = strings.TrimPrefix(tempHost, "http://")
 		targetIP = getIP()
 		return
 	}
 
 	// Check for if input is string localhost
 	if *t == "localhost" {
-		temphost := *t
-		host = strings.TrimPrefix(temphost, "http://")
+		tempHost := *t
+		host = strings.TrimPrefix(tempHost, "http://")
 		targetIP = getIP()
 		return
 	}
 
 	// Add http prefix to check isURI again
-	temphost := fmt.Sprintf("%s%s", "http://", *t)
-	_, err2 := url.ParseRequestURI(temphost)
+	tempHost := fmt.Sprintf("%s%s", "http://", *t)
+	_, err2 := url.ParseRequestURI(tempHost)
 	if err2 == nil {
-		host = strings.TrimPrefix(temphost, "http://")
+		host = strings.TrimPrefix(tempHost, "http://")
 		targetIP = getIP()
 		return
 	}
@@ -254,22 +254,22 @@ func getIP() string {
 func init() {
 	flag.Parse()
 	if *v {
-		isverbose = true
+		isVerbose = true
 		fmt.Println("Gordo is in a talkative mood right now")
 	} else {
-		isverbose = false
+		isVerbose = false
 	}
 
 	if *a {
-		isallports = true
+		isAllPorts = true
 	} else {
-		isallports = false
+		isAllPorts = false
 	}
 
 	if *syn != "" {
-		issynscan = true
+		isSynScan = true
 	} else {
-		issynscan = false
+		isSynScan = false
 	}
 
 	if *w > 0 {
@@ -280,7 +280,7 @@ func init() {
 		workers = 100
 	}
 
-	if isverbose {
+	if isVerbose {
 		fmt.Println("Worker Count: ", workers)
 	}
 }
