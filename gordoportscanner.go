@@ -42,10 +42,10 @@ func main() {
 
 	// Check for empty argument list and validate target input
 	if len(os.Args) <= 1 {
-		prheader()
+		prHeader()
 		os.Exit(0)
 	}
-	targetcheck(&host, &targetIP)
+	targetCheck(&host, &targetIP)
 
 	if isVerbose {
 		fmt.Println("Scan target: ", host)
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// Format and output results
-	outtable(openPorts, isVerbose, isSynScan, synResults)
+	outTable(openPorts, isVerbose, isSynScan, synResults)
 
 	// Manage duration of program
 	stopTime := time.Now()
@@ -138,7 +138,7 @@ func sniff(iface string, synResults map[string]int, targetIP *string) {
 }
 
 // Print ordered results with added service type to terminal
-func outtable(openPorts []int, isVerbose bool, isSynScan bool, synResults map[string]int) {
+func outTable(openPorts []int, isVerbose bool, isSynScan bool, synResults map[string]int) {
 	sort.Ints(openPorts)
 
 	// Hashmap of common port names
@@ -191,7 +191,7 @@ func outtable(openPorts []int, isVerbose bool, isSynScan bool, synResults map[st
 }
 
 // Check if user input for target is valid IP or URI
-func targetcheck(host *string, targetIP *string) {
+func targetCheck(host *string, targetIP *string) {
 
 	// Check for valid IP in input
 	checkIP := net.ParseIP(*t)
@@ -228,7 +228,7 @@ func targetcheck(host *string, targetIP *string) {
 	}
 
 	// Exit program since no valid input
-	prheader()
+	prHeader()
 	fmt.Println("Error: No valid IP or URI given")
 	fmt.Println("Error on input target candidate: ", *t)
 	os.Exit(0)
@@ -285,7 +285,7 @@ func init() {
 }
 
 // Print header when no arguments in CLI or on error
-func prheader() {
+func prHeader() {
 	var Reset = "\033[0m"
 	var White = "\033[97m"
 	fmt.Println("Gordo Port Scanner by BenPapple")
