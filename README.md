@@ -1,5 +1,5 @@
 # Gordo Port Scanner
-Basic port scanner for TCP.
+A Port scanner for TCP written in Go.
 
 # Flags
 -a "enable all ports scan"
