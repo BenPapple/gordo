@@ -189,7 +189,6 @@ func outTable(isVerbose bool, isSynScan bool, openPorts map[string]int) {
 		sort.Ints(keys)
 		for _, k := range keys {
 			if openPorts[string(k)] > 0 {
-				//i, _ := strconv.Atoi(k)
 				pType := portType[k]
 				fmt.Printf("%-5d %-4d %s\n", k, openPorts[string(k)], pType)
 			}
@@ -205,7 +204,6 @@ func outTable(isVerbose bool, isSynScan bool, openPorts map[string]int) {
 		sort.Ints(keys)
 		for _, k := range keys {
 			if openPorts[string(k)] >= 0 {
-				//i, _ := strconv.Atoi(k)
 				pType := portType[k]
 				fmt.Printf("%-5d %s\n", k, pType)
 			}
