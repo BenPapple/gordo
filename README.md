@@ -1,6 +1,10 @@
 # Gordo Port Scanner
 A Port scanner for TCP written in Go.
 
+Example scan on Metasploitable2:
+
+![Scan with gordo on metasploitable2](https://github.com/BenPapple/gordoportscanner/blob/main/pics/gordometasploitablescan.png?raw=true)
+
 # Flags
 -a "enable all ports scan"
 
