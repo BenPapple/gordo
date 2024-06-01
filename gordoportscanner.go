@@ -181,31 +181,33 @@ func outTable(isVerbose bool, isSynScan bool, openPorts map[string]int) {
 	if isSynScan {
 		fmt.Printf("%-5v %-4v %v\n", "PORT", "SYN", "SERVICE")
 		// Order map by string and print
-		keys := make([]string, 0)
+		keys := make([]int, 0)
 		for k := range openPorts {
-			keys = append(keys, k)
+			in, _ := strconv.Atoi(k)
+			keys = append(keys, in)
 		}
-		sort.Strings(keys)
+		sort.Ints(keys)
 		for _, k := range keys {
-			if openPorts[k] > 0 {
-				i, _ := strconv.Atoi(k)
-				pType := portType[i]
-				fmt.Printf("%-5s %-4d %s\n", k, openPorts[k], pType)
+			if openPorts[string(k)] > 0 {
+				//i, _ := strconv.Atoi(k)
+				pType := portType[k]
+				fmt.Printf("%-5d %-4d %s\n", k, openPorts[string(k)], pType)
 			}
 		}
 	} else {
 		fmt.Printf("%-5v %v\n", "PORT", "SERVICE")
 		// Order map by string and print
-		keys := make([]string, 0)
+		keys := make([]int, 0)
 		for k := range openPorts {
-			keys = append(keys, k)
+			in, _ := strconv.Atoi(k)
+			keys = append(keys, in)
 		}
-		sort.Strings(keys)
+		sort.Ints(keys)
 		for _, k := range keys {
-			if openPorts[k] >= 0 {
-				i, _ := strconv.Atoi(k)
-				pType := portType[i]
-				fmt.Printf("%-5s %s\n", k, pType)
+			if openPorts[string(k)] >= 0 {
+				//i, _ := strconv.Atoi(k)
+				pType := portType[k]
+				fmt.Printf("%-5d %s\n", k, pType)
 			}
 		}
 	}
